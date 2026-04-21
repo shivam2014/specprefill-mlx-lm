@@ -13,7 +13,8 @@ Reduces TTFT (Time-To-First-Token) on long prompts by using a small draft model 
 **Hardware:** Apple M1 Max 64GB  
 **Target:** Qwen3.6-35B-A3B-mixed4_6  
 **Draft:** Qwen3.5-0.8B-MLX-4bit-fp16  
-**KV Cache:** K8/V4 asymmetric quantization
+**KV Cache:** Asymmetric K8/V4 quantization (via `--kv-bits 8,4 --kv-group-size 64,32`)  
+**Thinking Models:** Includes `preserve_thinking` patch for Qwen3.x chat templates
 
 | Config | TTFT | pf_tps | Speedup | Quality |
 |--------|------|--------|---------|---------|
@@ -128,18 +129,37 @@ See `docs/SPECPREFILL_INTEGRATION.md` for full code snippets.
 
 ## Usage
 
-### Server Mode
+### Server Mode (with KV Split + SpecPrefill)
+
+This is the full server command used for testing, combining asymmetric KV quantization with SpecPrefill:
+
+```bash
+python -m mlx_lm server \
+  --model /Users/shivam94/.cache/huggingface/hub/Qwen3.6-35B-A3B-mixed4_6 \
+  --host 127.0.0.1 --port 8000 \
+  --kv-bits 8,4 --kv-group-size 64,32 \
+  --prefill-step-size 2048 \
+  --specprefill-model /Users/shivam94/.cache/huggingface/hub/mlx-community/Qwen3.5-0.8B-MLX-4bit-fp16 \
+  --specprefill-keep-pct 0.3 \
+  --specprefill-threshold 8192 \
+  --specprefill-lookahead 8 \
+  --log-level INFO
+```
+
+**Key flags:**
+- `--kv-bits 8,4` + `--kv-group-size 64,32`: Asymmetric KV split (K=8bit, V=4bit)
+- `--specprefill-model`: Draft model for token importance scoring
+- `--specprefill-keep-pct`: Fraction of tokens to keep (0.1=max speedup, 0.3=safe default)
+- `--specprefill-threshold`: Only trigger on prompts > 8192 tokens
+
+### Server Mode (minimal)
 
 ```bash
 python -m mlx_lm server \
   --model Qwen3.6-35B-A3B-mixed4_6 \
   --host 127.0.0.1 --port 8000 \
-  --kv-bits 8,4 --kv-group-size 64,32 \
-  --prefill-step-size 2048 \
   --specprefill-model Qwen3.5-0.8B-MLX-4bit-fp16 \
-  --specprefill-keep-pct 0.3 \
-  --specprefill-threshold 8192 \
-  --specprefill-lookahead 8
+  --specprefill-keep-pct 0.3
 ```
 
 ### CLI Generation
@@ -238,14 +258,27 @@ See [docs/SPECPREFILL_INTEGRATION.md](docs/SPECPREFILL_INTEGRATION.md) for:
 
 ---
 
-## Prior Patches
+## Other Patches Included
 
-This repo also documents other mlx-lm modifications:
-- `preserve_thinking` for Qwen3.x chat templates
-- `checkpoint_caching` for KV cache trimming
-- PR #1102 memory optimization (documented, not applied)
+This repo also includes documentation for other mlx-lm modifications that are applied in the test environment:
 
-See [docs/PATCH_INVENTORY.md](docs/PATCH_INVENTORY.md).
+| Patch | File | Status | Description |
+|-------|------|--------|-------------|
+| **Asymmetric KV Split** | `models/cache.py` | **Applied** | `--kv-bits 8,4 --kv-group-size 64,32` for K=8bit/V=4bit quantization. Reduces memory vs symmetric KV. |
+| **preserve_thinking** | `server.py` | **Applied** | `preserve_thinking=True` for Qwen3.x chat templates. Stabilizes cache keys across turns. |
+| **checkpoint_caching** | `server.py` | **Applied** | Trims KV cache before `<think>` token. Enables delta-prefill on next turn. |
+| PR #1102 memory opt | `convert.py` | Documented | Per-layer eval during quantization (22-37% peak memory reduction). See `docs/PATCH_INVENTORY.md`. |
+
+See [docs/PATCH_INVENTORY.md](docs/PATCH_INVENTORY.md) for implementation details.
+
+---
+
+## Architecture
+
+See [docs/SPECPREFILL_INTEGRATION.md](docs/SPECPREFILL_INTEGRATION.md) for:
+- How RoPE position mapping works
+- Hybrid model handling (Qwen3.5 GatedDeltaNet layers)
+- Sparse prefill vs standard speculative decoding differences
 
 ---
 
