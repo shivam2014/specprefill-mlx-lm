@@ -32,7 +32,7 @@ At `keep_pct=0.1`, output is bit-identical to baseline for this prompt. See [ben
 
 - Python 3.10+
 - `mlx-lm` >= 0.31.2
-- A draft model (e.g. Qwen3.5-0.8B, Llama-3.2-1B)
+- A draft model (e.g. Qwen3.5-0.8B)
 
 ```bash
 pip install mlx-lm
@@ -73,22 +73,18 @@ If `patch` fails due to version mismatch, see [Manual Integration](#manual-integ
 ### Step 3: Download a Draft Model
 
 ```bash
-# Option A: Qwen3.5-0.8B (recommended, small and fast)
+# Qwen3.5-0.8B (tested and recommended)
 huggingface-cli download mlx-community/Qwen3.5-0.8B-MLX-4bit-fp16 \
     --local-dir ~/.cache/huggingface/hub/Qwen3.5-0.8B-MLX-4bit-fp16
-
-# Option B: Llama-3.2-1B (if you use Llama target models)
-huggingface-cli download mlx-community/Llama-3.2-1B-Instruct-4bit \
-    --local-dir ~/.cache/huggingface/hub/Llama-3.2-1B-Instruct-4bit
 ```
 
-The draft model should be the same architecture family as your target model (Qwen for Qwen, Llama for Llama).
+The draft model must be the same architecture family as your target model (Qwen for Qwen).
 
 ### Step 4: Verify It Works
 
 ```bash
 python -m mlx_lm benchmark \
-  --model Qwen3.6-35B-A3B-mixed4_6 \
+  --model /path/to/your/Qwen/model \
   --prompt-tokens 16384 \
   --generation-tokens 20 \
   --specprefill-model ~/.cache/huggingface/hub/Qwen3.5-0.8B-MLX-4bit-fp16 \
