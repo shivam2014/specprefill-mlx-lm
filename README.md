@@ -281,6 +281,17 @@ See [docs/SPECPREFILL_INTEGRATION.md](docs/SPECPREFILL_INTEGRATION.md) for:
 
 ---
 
+## Credits
+
+- **SpecPrefill paper:** Liu et al., "Speculative Prefill: Turbocharging TTFT with Lightweight and Training-Free Token Importance Estimation", ICML 2025. [arXiv:2502.02789](https://arxiv.org/abs/2502.02789)
+- **Reference implementation:** [vllm-mlx PR #180](https://github.com/waybarrios/vllm-mlx/pull/180) by waybarrios (merged Mar 2026)
+- **Base framework:** [mlx-lm](https://github.com/ml-explore/mlx-lm) by Apple/ml-explore
+- **Benchmark methodology:** Inspired by [Blaizzy's mlx-vlm TurboQuant benchmark](https://gist.github.com/Blaizzy/d6d975b5a6fde1b590b56f1ca34cdc77)
+
+This is a community port. Not affiliated with Apple, ml-explore, or the original paper authors.
+
+---
+
 ## License
 
 Apache-2.0 (matches mlx-lm and the original SpecPrefill paper).
