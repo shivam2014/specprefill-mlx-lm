@@ -1,0 +1,50 @@
+[
+  {
+    "prompt_len": 8192,
+    "baseline": {
+      "raw_output": "Running warmup..\nTiming with prompt_tokens=8192, generation_tokens=20, batch_size=1.\nTrial 1:  prompt_tps=792.168, generation_tps=66.888, peak_memory=23.354, total_time=10.783\nTrial 2:  prompt_tps=791.658, generation_tps=65.982, peak_memory=23.355, total_time=10.794\nTrial 3:  prompt_tps=791.897, generation_tps=66.395, peak_memory=23.355, total_time=10.790\nAverages: prompt_tps=791.908, generation_tps=66.421, peak_memory=23.355\n",
+      "prompt_tps": 791.908,
+      "generation_tps": 66.421,
+      "peak_memory": 23.355
+    },
+    "specprefill": {
+      "raw_output": "Running warmup..\nTiming with prompt_tokens=8192, generation_tokens=20, batch_size=1.\nTrial 1:  prompt_tps=790.840, generation_tps=66.838, peak_memory=23.778, total_time=10.798\nTrial 2:  prompt_tps=791.630, generation_tps=66.376, peak_memory=23.779, total_time=10.790\nTrial 3:  prompt_tps=791.418, generation_tps=66.446, peak_memory=23.779, total_time=10.793\nAverages: prompt_tps=791.296, generation_tps=66.553, peak_memory=23.779\n",
+      "prompt_tps": 791.296,
+      "generation_tps": 66.553,
+      "peak_memory": 23.779
+    },
+    "speedup": 1.0007734147525071
+  },
+  {
+    "prompt_len": 16384,
+    "baseline": {
+      "raw_output": "Running warmup..\nTiming with prompt_tokens=16384, generation_tokens=20, batch_size=1.\nTrial 1:  prompt_tps=734.082, generation_tps=61.401, peak_memory=24.025, total_time=22.785\nTrial 2:  prompt_tps=734.105, generation_tps=61.214, peak_memory=24.026, total_time=22.786\nTrial 3:  prompt_tps=734.296, generation_tps=62.066, peak_memory=24.026, total_time=22.776\nAverages: prompt_tps=734.161, generation_tps=61.561, peak_memory=24.026\n",
+      "prompt_tps": 734.161,
+      "generation_tps": 61.561,
+      "peak_memory": 24.026
+    },
+    "specprefill": {
+      "raw_output": "Running warmup..\nTiming with prompt_tokens=16384, generation_tokens=20, batch_size=1.\nTrial 1:  prompt_tps=1292.435, generation_tps=29.896, peak_memory=25.338, total_time=13.487\nTrial 2:  prompt_tps=1288.801, generation_tps=29.829, peak_memory=25.339, total_time=13.525\nTrial 3:  prompt_tps=1288.977, generation_tps=30.065, peak_memory=25.340, total_time=13.518\nAverages: prompt_tps=1290.071, generation_tps=29.930, peak_memory=25.339\n",
+      "prompt_tps": 1290.071,
+      "generation_tps": 29.93,
+      "peak_memory": 25.339
+    },
+    "speedup": 0.5690857324906924
+  },
+  {
+    "prompt_len": 32768,
+    "baseline": {
+      "raw_output": "Running warmup..\nTiming with prompt_tokens=32768, generation_tokens=20, batch_size=1.\nTrial 1:  prompt_tps=637.626, generation_tps=55.860, peak_memory=25.460, total_time=51.890\nTrial 2:  prompt_tps=637.712, generation_tps=56.004, peak_memory=25.461, total_time=51.882\nTrial 3:  prompt_tps=637.655, generation_tps=56.174, peak_memory=25.461, total_time=51.886\nAverages: prompt_tps=637.664, generation_tps=56.012, peak_memory=25.461\n",
+      "prompt_tps": 637.664,
+      "generation_tps": 56.012,
+      "peak_memory": 25.461
+    },
+    "specprefill": {
+      "raw_output": "Running warmup..\nTiming with prompt_tokens=32768, generation_tokens=20, batch_size=1.\nTrial 1:  prompt_tps=1177.282, generation_tps=28.686, peak_memory=26.038, total_time=28.673\nTrial 2:  prompt_tps=1174.924, generation_tps=28.807, peak_memory=26.039, total_time=28.726\nTrial 3:  prompt_tps=1176.350, generation_tps=28.808, peak_memory=26.040, total_time=28.693\nAverages: prompt_tps=1176.185, generation_tps=28.767, peak_memory=26.039\n",
+      "prompt_tps": 1176.185,
+      "generation_tps": 28.767,
+      "peak_memory": 26.039
+    },
+    "speedup": 0.5421460059429427
+  }
+]

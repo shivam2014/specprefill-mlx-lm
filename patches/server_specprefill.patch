@@ -1,0 +1,82 @@
+--- /Users/shivam94/mlx-env/lib/python3.12/site-packages/mlx_lm/server.py.bak	2026-04-21 13:27:08
++++ /Users/shivam94/mlx-env/lib/python3.12/site-packages/mlx_lm/server.py	2026-04-21 13:33:42
+@@ -276,6 +276,7 @@
+         self.model = None
+         self.tokenizer = None
+         self.draft_model = None
++        self.specprefill_model = None
+         self.is_batchable = False
+ 
+         group = mx.distributed.init()
+@@ -373,6 +374,10 @@
+             self.is_batchable = all(
+                 hasattr(c, "merge") for c in make_prompt_cache(self.model)
+             )
++
++        # Load specprefill model if specified
++        if self.cli_args.specprefill_model is not None:
++            self.specprefill_model, _ = load(self.cli_args.specprefill_model)
+ 
+         return self.model, self.tokenizer
+ 
+@@ -962,6 +967,13 @@
+                 kv_kwargs["kv_bits"] = self.cli_args.kv_bits
+                 kv_kwargs["kv_group_size"] = self.cli_args.kv_group_size
+                 kv_kwargs["quantized_kv_start"] = getattr(self.cli_args, "quantized_kv_start", 0)
++            specprefill_kwargs = {}
++            if self.model_provider.specprefill_model is not None:
++                specprefill_kwargs["specprefill_model"] = self.model_provider.specprefill_model
++                specprefill_kwargs["specprefill_keep_pct"] = getattr(self.cli_args, "specprefill_keep_pct", 0.3)
++                specprefill_kwargs["specprefill_threshold"] = getattr(self.cli_args, "specprefill_threshold", 8192)
++                specprefill_kwargs["specprefill_lookahead"] = getattr(self.cli_args, "specprefill_lookahead", 8)
++                specprefill_kwargs["specprefill_pool_kernel"] = getattr(self.cli_args, "specprefill_pool_kernel", 13)
+             for gen in stream_generate(
+                 model=model,
+                 tokenizer=tokenizer,
+@@ -975,6 +987,7 @@
+                 prompt_progress_callback=progress,
+                 prefill_step_size=self.cli_args.prefill_step_size,
+                 **kv_kwargs,
++                **specprefill_kwargs,
+             ):
+                 finish_reason = gen.finish_reason
+                 sm_state, match_sequence, current_state = sm.match(sm_state, gen.token)
+@@ -1812,8 +1825,38 @@
+         type=int,
+         help="Number of tokens to draft when using speculative decoding.",
+         default=3,
++    )
++    parser.add_argument(
++        "--specprefill-model",
++        type=str,
++        help="A small model to use for SpecPrefill token importance scoring.",
++        default=None,
+     )
+     parser.add_argument(
++        "--specprefill-keep-pct",
++        type=float,
++        help="Fraction of prompt tokens to keep with SpecPrefill (default: 0.3)",
++        default=0.3,
++    )
++    parser.add_argument(
++        "--specprefill-threshold",
++        type=int,
++        help="Minimum prompt length to trigger SpecPrefill (default: 8192)",
++        default=8192,
++    )
++    parser.add_argument(
++        "--specprefill-lookahead",
++        type=int,
++        help="Number of lookahead decode steps for SpecPrefill scoring (default: 8)",
++        default=8,
++    )
++    parser.add_argument(
++        "--specprefill-pool-kernel",
++        type=int,
++        help="Pooling kernel size for attention score smoothing (default: 13)",
++        default=13,
++    )
++    parser.add_argument(
+         "--trust-remote-code",
+         action="store_true",
+         help="Enable trusting remote code for tokenizer",

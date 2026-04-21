@@ -1,0 +1,81 @@
+From 89419964ea24442e2d5fe673f15554eb51bd71de Mon Sep 17 00:00:00 2001
+From: shivam94 <shivam94@gmail.com>
+Date: Tue, 21 Apr 2026 15:56:52 +0200
+Subject: [PATCH] add specprefill CLI args to generate.py main()
+
+---
+ generate.py | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/generate.py b/generate.py
+index 62107fb..52452fc 100644
+--- a/generate.py
++++ b/generate.py
+@@ -219,6 +219,36 @@ def setup_arg_parser():
+         help="Number of tokens to draft when using speculative decoding.",
+         default=3,
+     )
++    parser.add_argument(
++        "--specprefill-model",
++        type=str,
++        help="A small model to score token importance for SpecPrefill TTFT reduction.",
++        default=None,
++    )
++    parser.add_argument(
++        "--specprefill-keep-pct",
++        type=float,
++        help="Fraction of tokens to keep during SpecPrefill sparse prefill (0.0-1.0).",
++        default=0.3,
++    )
++    parser.add_argument(
++        "--specprefill-threshold",
++        type=int,
++        help="Minimum prompt length to trigger SpecPrefill.",
++        default=8192,
++    )
++    parser.add_argument(
++        "--specprefill-lookahead",
++        type=int,
++        help="Number of lookahead decode steps for SpecPrefill token scoring.",
++        default=8,
++    )
++    parser.add_argument(
++        "--specprefill-pool-kernel",
++        type=int,
++        help="Smoothing kernel size for SpecPrefill attention score pooling.",
++        default=13,
++    )
+     return parser
+ 
+ 
+@@ -2080,6 +2110,15 @@ def main():
+             raise ValueError("Draft model tokenizer does not match model tokenizer.")
+     else:
+         draft_model = None
++
++    if args.specprefill_model is not None:
++        specprefill_model, specprefill_tokenizer = load(args.specprefill_model)
++        if specprefill_tokenizer.vocab_size != tokenizer.vocab_size:
++            raise ValueError(
++                "SpecPrefill model tokenizer does not match model tokenizer."
++            )
++    else:
++        specprefill_model = None
+     sampler = make_sampler(
+         args.temp,
+         args.top_p,
+@@ -2104,6 +2143,11 @@ def main():
+         quantized_kv_start=args.quantized_kv_start,
+         draft_model=draft_model,
+         num_draft_tokens=args.num_draft_tokens,
++        specprefill_model=specprefill_model,
++        specprefill_keep_pct=args.specprefill_keep_pct,
++        specprefill_threshold=args.specprefill_threshold,
++        specprefill_lookahead=args.specprefill_lookahead,
++        specprefill_pool_kernel=args.specprefill_pool_kernel,
+     )
+     if not args.verbose:
+         print(response)
+-- 
+2.50.1 (Apple Git-155)
+

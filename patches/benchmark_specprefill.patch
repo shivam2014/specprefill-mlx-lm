@@ -1,0 +1,100 @@
+From 687cea35c661924aa7a1e5d36f75866fea67eea4 Mon Sep 17 00:00:00 2001
+From: shivam94 <shivam94@gmail.com>
+Date: Tue, 21 Apr 2026 16:24:41 +0200
+Subject: [PATCH] add specprefill support to built-in benchmark.py
+
+---
+ benchmark.py | 48 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 46 insertions(+), 2 deletions(-)
+
+diff --git a/benchmark.py b/benchmark.py
+index 8bfafe8..134eeb1 100644
+--- a/benchmark.py
++++ b/benchmark.py
+@@ -73,6 +73,30 @@ def setup_arg_parser():
+         default=0,
+         help="Delay between each test in seconds (default: 0)",
+     )
++    parser.add_argument(
++        "--specprefill-model",
++        type=str,
++        help="Small model for SpecPrefill TTFT reduction.",
++        default=None,
++    )
++    parser.add_argument(
++        "--specprefill-keep-pct",
++        type=float,
++        default=0.3,
++        help="Fraction of tokens to keep during SpecPrefill.",
++    )
++    parser.add_argument(
++        "--specprefill-threshold",
++        type=int,
++        default=8192,
++        help="Minimum prompt length to trigger SpecPrefill.",
++    )
++    parser.add_argument(
++        "--specprefill-lookahead",
++        type=int,
++        default=8,
++        help="Lookahead decode steps for SpecPrefill.",
++    )
+     return parser
+ 
+ 
+@@ -104,6 +128,10 @@ def main():
+             model_config={"quantize_activations": args.quantize_activations},
+         )
+ 
++    specprefill_model = None
++    if args.specprefill_model:
++        specprefill_model, _ = load(args.specprefill_model)
++
+     # Empty to avoid early stopping
+     tokenizer._eos_token_ids = {}
+ 
+@@ -115,23 +143,39 @@ def main():
+     prompt = prompts[0]
+ 
+     def single_bench():
++        kwargs = {"prefill_step_size": args.prefill_step_size}
++        if specprefill_model is not None:
++            kwargs.update({
++                "specprefill_model": specprefill_model,
++                "specprefill_keep_pct": args.specprefill_keep_pct,
++                "specprefill_threshold": args.specprefill_threshold,
++                "specprefill_lookahead": args.specprefill_lookahead,
++            })
+         for response in stream_generate(
+             model,
+             tokenizer,
+             prompt,
+             max_tokens=generation_tokens,
+-            prefill_step_size=args.prefill_step_size,
++            **kwargs,
+         ):
+             pass
+         return response
+ 
+     def batch_bench():
++        kwargs = {"prefill_step_size": args.prefill_step_size}
++        if specprefill_model is not None:
++            kwargs.update({
++                "specprefill_model": specprefill_model,
++                "specprefill_keep_pct": args.specprefill_keep_pct,
++                "specprefill_threshold": args.specprefill_threshold,
++                "specprefill_lookahead": args.specprefill_lookahead,
++            })
+         return batch_generate(
+             model,
+             tokenizer,
+             prompts,
+             max_tokens=generation_tokens,
+-            prefill_step_size=args.prefill_step_size,
++            **kwargs,
+         ).stats
+ 
+     if batch_size == 1:
+-- 
+2.50.1 (Apple Git-155)
+
