@@ -13,8 +13,7 @@ Reduces TTFT (Time-To-First-Token) on long prompts by using a small draft model 
 **Hardware:** Apple M1 Max 64GB  
 **Target:** Qwen3.6-35B-A3B-mixed4_6  
 **Draft:** Qwen3.5-0.8B-MLX-4bit-fp16  
-**KV Cache:** Asymmetric K8/V4 quantization (via `--kv-bits 8,4 --kv-group-size 64,32`)  
-**Thinking Models:** Includes `preserve_thinking` patch for Qwen3.x chat templates
+**KV Cache:** Asymmetric K8/V4 quantization (via `--kv-bits 8,4 --kv-group-size 64,32`)
 
 | Config | TTFT | pf_tps | Speedup | Quality |
 |--------|------|--------|---------|---------|
@@ -260,14 +259,14 @@ See [docs/SPECPREFILL_INTEGRATION.md](docs/SPECPREFILL_INTEGRATION.md) for:
 
 ## Other Patches Included
 
-This repo also includes documentation for other mlx-lm modifications that are applied in the test environment:
+This repo also includes documentation for other mlx-lm modifications:
 
 | Patch | File | Status | Description |
 |-------|------|--------|-------------|
 | **Asymmetric KV Split** | `models/cache.py` | **Applied** | `--kv-bits 8,4 --kv-group-size 64,32` for K=8bit/V=4bit quantization. Reduces memory vs symmetric KV. |
-| **preserve_thinking** | `server.py` | **Applied** | `preserve_thinking=True` for Qwen3.x chat templates. Stabilizes cache keys across turns. |
-| **checkpoint_caching** | `server.py` | **Applied** | Trims KV cache before `<think>` token. Enables delta-prefill on next turn. |
 | PR #1102 memory opt | `convert.py` | Documented | Per-layer eval during quantization (22-37% peak memory reduction). See `docs/PATCH_INVENTORY.md`. |
+
+**Note:** `preserve_thinking` and `checkpoint_caching` for Qwen3.x thinking models are already present in upstream mlx-lm v0.31.2 (verified against fresh `pip install mlx-lm==0.31.2`).
 
 See [docs/PATCH_INVENTORY.md](docs/PATCH_INVENTORY.md) for implementation details.
 

@@ -11,8 +11,9 @@ Baseline: `b13ea73` = vanilla mlx-lm v0.31.2
 
 | Patch | File | Status | Description |
 |-------|------|--------|-------------|
-| 01_preserve_thinking | `server.py` | **APPLIED** | Qwen3.x `preserve_thinking=True` for stable cache keys |
-| 02_checkpoint_caching | `server.py` | **APPLIED** | Trim KV cache before `<think>` token for cache hits |
+| 01_preserve_thinking | `server.py` | **Upstream (v0.31.2+)** | Qwen3.x `preserve_thinking=True` for stable cache keys. Already in mlx-lm. |
+| 02_checkpoint_caching | `server.py` | **Upstream (v0.31.2+)** | Trim KV cache before `<think>` token for cache hits. Already in mlx-lm. |
+| Asymmetric KV Split | `models/cache.py` | **Applied** | `--kv-bits 8,4 --kv-group-size 64,32` support. Custom modification. |
 | pr-1102-memory-opt | `convert.py` | NOT APPLIED | Per-layer eval during quantization (documented only) |
 
 ### Verify Applied Patches
