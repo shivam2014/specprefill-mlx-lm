@@ -74,8 +74,8 @@ If `patch` fails due to version mismatch, see [Manual Integration](#manual-integ
 
 ```bash
 # Qwen3.5-0.8B (tested and recommended)
-huggingface-cli download mlx-community/Qwen3.5-0.8B-MLX-4bit-fp16 \
-    --local-dir ~/.cache/huggingface/hub/Qwen3.5-0.8B-MLX-4bit-fp16
+huggingface-cli download mlx-community/Qwen3.5-0.8B-MLX-4bit \
+    --local-dir ~/.cache/huggingface/hub/Qwen3.5-0.8B-MLX-4bit
 ```
 
 The draft model must be the same architecture family as your target model (Qwen for Qwen).
