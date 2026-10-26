@@ -1,86 +1,89 @@
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%"
+       alt="SpecPrefill for mlx-lm — a 0.8B draft model scores 32-token chunks, and the 35B target prefills only the ones that matter. Measured 1.76x faster prompt processing at 16K and 1.84x at 32K.">
+</p>
+
 # SpecPrefill for mlx-lm
 
-Speculative Prefill (SpecPrefill) implementation for [mlx-lm](https://github.com/ml-explore/mlx-lm), ported from the [vllm-mlx PR #180](https://github.com/waybarrios/vllm-mlx/pull/180) reference.
+**Sparse prefill for long prompts.** A small draft model estimates which tokens matter, and the target model prefills only those — cutting time-to-first-token without touching model weights or training anything.
 
-Reduces TTFT (Time-To-First-Token) on long prompts by using a small draft model to identify important tokens, then sparse-prefilling the target model with only those tokens.
+Ported from [vllm-mlx PR #180](https://github.com/waybarrios/vllm-mlx/pull/180) to [mlx-lm](https://github.com/ml-explore/mlx-lm), for Apple Silicon.
 
 **Paper:** [Speculative Prefill: Turbocharging TTFT with Lightweight and Training-Free Token Importance Estimation](https://arxiv.org/abs/2502.02789) (ICML 2025)
 
----
+## How it works
 
-## Benchmark Results
+1. The prompt is split into fixed 32-token chunks.
+2. A small draft model (0.8B) runs a few decode steps and scores each chunk's importance from attention over the lookahead window.
+3. The target model prefills only the kept chunks in one sparse pass, with RoPE positions remapped so the surviving tokens keep their original positions.
 
-**Hardware:** Apple M1 Max 64GB  
-**Target:** Qwen3.6-35B-A3B-mixed4_6  
-**Draft:** Qwen3.5-0.8B-MLX-4bit-fp16  
-**KV Cache:** Asymmetric K8/V4 quantization (via `--kv-bits 8,4 --kv-group-size 64,32`)
+It triggers only on prompts above `--specprefill-threshold` (default 8192 tokens), so short requests take the normal path.
 
-| Config | TTFT | pf_tps | Speedup | Quality |
-|--------|------|--------|---------|---------|
-| Baseline | 23.1s | 706 | 1.00x | -- |
-| keep=0.5 | 18.1s | 905 | 1.28x | Preserved |
-| keep=0.3 | 12.6s | 1298 | 1.83x | Preserved |
-| keep=0.1 | 7.4s | 2226 | **3.11x** | Preserved |
+## Results
 
-At `keep_pct=0.1`, output is bit-identical to baseline for this prompt. See [benchmarks/](benchmarks/) for full reproduction scripts.
+**Hardware:** Apple M1 Max 64GB · **Target:** `Qwen3.6-35B-A3B-mixed4_6` · **Draft:** `Qwen3.5-0.8B-MLX-4bit-fp16` · **Date:** 2026-04-21, commit `687cea3`
 
----
+| Prompt | Baseline pf_tps | SpecPrefill pf_tps | Speedup | Decode tok/s |
+|--------|----------------:|-------------------:|---------|--------------|
+| 8,192 | 791.9 | 791.3 | 1.00x | 66.4 → 66.6 |
+| 16,384 | 734.2 | **1,290.1** | **1.76x** | 61.6 → 29.9 |
+| 32,768 | 637.7 | **1,176.2** | **1.84x** | 56.0 → 28.8 |
+
+Source: [`benchmarks/bench_specprefill_official_results.md`](benchmarks/bench_specprefill_official_results.md), raw runs in the adjacent `.json`.
+
+**Read the trade-offs:**
+
+- **No gain at 8,192.** Prompt length equals the threshold, and SpecPrefill only triggers above it.
+- **Decode throughput roughly halves** (61.6 → 29.9 tok/s at 16K). The first decode token comes from sparse-prefill logits rather than a full prefill, so this is expected — but it means SpecPrefill pays off when TTFT dominates, not on long generation.
+- **Peak memory rises slightly** (~0.3-1.3GB) because the draft model stays loaded.
+- **Output quality is not measured here.** These numbers are prefill throughput only. The chunk selection is approximate by design; validate on your workload before relying on it.
+
+`keep_pct` is the main dial. Sweep it on your own hardware with [`benchmarks/bench_keeppct_sweep.py`](benchmarks/bench_keeppct_sweep.py) — results depend on the prompt, so this repo does not ship a universal table.
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.10+
-- `mlx-lm` >= 0.31.2
-- A draft model (e.g. Qwen3.5-0.8B)
+Requires Python 3.10+, `mlx-lm >= 0.31.2`, and a draft model from the same architecture family as your target (Qwen for Qwen).
 
 ```bash
 pip install mlx-lm
 ```
 
-### Step 1: Download This Repo
+### Apply the patches
 
 ```bash
-git clone https://github.com/shivam94/specprefill-mlx-lm.git
+# 1. Clone this repo
+git clone https://github.com/shivam2014/specprefill-mlx-lm.git
 cd specprefill-mlx-lm
-```
 
-### Step 2: Apply Patches to Your mlx-lm Installation
-
-```bash
-# Find where mlx-lm is installed
+# 2. Locate your mlx-lm install and copy the core algorithm
+REPO=$(pwd)
 MLX_LM=$(python -c "import mlx_lm, os; print(os.path.dirname(mlx_lm.__file__))")
 echo "mlx-lm is at: $MLX_LM"
+cp "$REPO/patches/specprefill.py" "$MLX_LM/"
 
-# Copy the core SpecPrefill algorithm
-cp patches/specprefill.py "$MLX_LM/"
-
-# Apply the integration patches
+# 3. Apply the integration patches
 cd "$MLX_LM"
-patch -p2 < ~/specprefill-mlx-lm/patches/generate_specprefill.patch
-patch -p2 < ~/specprefill-mlx-lm/patches/cli_generate_specprefill.patch
-patch -p2 < ~/specprefill-mlx-lm/patches/server_specprefill.patch
+patch -p2 < "$REPO/patches/generate_specprefill.patch"
+patch -p2 < "$REPO/patches/cli_generate_specprefill.patch"
+patch -p2 < "$REPO/patches/server_specprefill.patch"
 
-# Optional: patch benchmark.py for built-in benchmarking
-patch -p2 < ~/specprefill-mlx-lm/patches/benchmark_specprefill.patch
+# Optional: benchmark.py integration
+patch -p2 < "$REPO/patches/benchmark_specprefill.patch"
 
-# Verify nothing is broken
+# 4. Verify nothing is broken
 python -m py_compile specprefill.py generate.py server.py benchmark.py
 ```
 
-If `patch` fails due to version mismatch, see [Manual Integration](#manual-integration) below.
+If `patch` fails on a version mismatch, use [manual integration](#manual-integration).
 
-### Step 3: Download a Draft Model
+### Download a draft model
 
 ```bash
-# Qwen3.5-0.8B (tested and recommended)
 huggingface-cli download mlx-community/Qwen3.5-0.8B-MLX-4bit \
     --local-dir ~/.cache/huggingface/hub/Qwen3.5-0.8B-MLX-4bit-fp16
 ```
 
-The draft model must be the same architecture family as your target model (Qwen for Qwen).
-
-### Step 4: Verify It Works
+### Verify it works
 
 ```bash
 python -m mlx_lm benchmark \
@@ -91,16 +94,14 @@ python -m mlx_lm benchmark \
   --specprefill-keep-pct 0.3
 ```
 
-If you see higher `prompt_tps` than without `--specprefill-model`, it's working.
+If `prompt_tps` comes back higher than the same run without `--specprefill-model`, it is working.
 
----
+### Manual integration
 
-### Manual Integration
-
-If `patch` fails (e.g. mlx-lm version mismatch), integrate manually:
+If `patch` fails (e.g. an mlx-lm version mismatch), integrate by hand:
 
 1. Copy `patches/specprefill.py` into your `mlx_lm/` directory.
-2. In `generate.py`, add these 5 kwargs to `generate_step()` and `stream_generate()`:
+2. In `generate.py`, add these kwargs to `generate_step()` and `stream_generate()`:
    ```python
    specprefill_model: Optional[nn.Module] = None,
    specprefill_keep_pct: float = 0.3,
@@ -120,48 +121,37 @@ If `patch` fails (e.g. mlx-lm version mismatch), integrate manually:
    else:
        # normal prefill loop
    ```
-4. In `server.py`, add `--specprefill-model` CLI arg and pass it to `stream_generate()`.
+4. In `server.py`, add the `--specprefill-model` CLI arg and pass it to `stream_generate()`.
 
-See `docs/SPECPREFILL_INTEGRATION.md` for full code snippets.
-
----
+Full snippets: [`docs/SPECPREFILL_INTEGRATION.md`](docs/SPECPREFILL_INTEGRATION.md).
 
 ## Usage
 
-### Server Mode (with KV Split + SpecPrefill)
-
-This is the full server command used for testing, combining asymmetric KV quantization with SpecPrefill:
+**Server, with asymmetric KV quantization:**
 
 ```bash
 python -m mlx_lm server \
-  --model /Users/shivam94/.cache/huggingface/hub/Qwen3.6-35B-A3B-mixed4_6 \
+  --model ~/.cache/huggingface/hub/Qwen3.6-35B-A3B-mixed4_6 \
   --host 127.0.0.1 --port 8000 \
   --kv-bits 8,4 --kv-group-size 64,32 \
   --prefill-step-size 2048 \
-  --specprefill-model /Users/shivam94/.cache/huggingface/hub/mlx-community/Qwen3.5-0.8B-MLX-4bit-fp16 \
+  --specprefill-model ~/.cache/huggingface/hub/Qwen3.5-0.8B-MLX-4bit-fp16 \
   --specprefill-keep-pct 0.3 \
   --specprefill-threshold 8192 \
   --specprefill-lookahead 8 \
   --log-level INFO
 ```
 
-**Key flags:**
-- `--kv-bits 8,4` + `--kv-group-size 64,32`: Asymmetric KV split (K=8bit, V=4bit)
-- `--specprefill-model`: Draft model for token importance scoring
-- `--specprefill-keep-pct`: Fraction of tokens to keep (0.1=max speedup, 0.3=safe default)
-- `--specprefill-threshold`: Only trigger on prompts > 8192 tokens
-
-### Server Mode (minimal)
+**Server, minimal:**
 
 ```bash
 python -m mlx_lm server \
   --model Qwen3.6-35B-A3B-mixed4_6 \
-  --host 127.0.0.1 --port 8000 \
   --specprefill-model Qwen3.5-0.8B-MLX-4bit-fp16 \
   --specprefill-keep-pct 0.3
 ```
 
-### CLI Generation
+**CLI:**
 
 ```bash
 python -m mlx_lm generate \
@@ -171,11 +161,10 @@ python -m mlx_lm generate \
   --specprefill-keep-pct 0.3
 ```
 
-### Programmatic
+**Python:**
 
 ```python
 from mlx_lm import load, stream_generate
-from mlx_lm.specprefill import cleanup_rope
 
 model, tokenizer = load("Qwen3.6-35B-A3B-mixed4_6")
 draft_model, _ = load("Qwen3.5-0.8B-MLX-4bit-fp16")
@@ -191,9 +180,20 @@ for response in stream_generate(
     print(response.text, end="")
 ```
 
----
+**Key flags:** `--kv-bits 8,4` + `--kv-group-size 64,32` enable asymmetric KV split (K=8-bit, V=4-bit); `--specprefill-keep-pct` is the fraction of chunks kept (0.1 for max speedup, 0.3 as a safe default); `--specprefill-threshold` gates the feature to long prompts.
 
-## Benchmark Reproduction
+## Hyperparameters
+
+| Parameter | Default | Range | Notes |
+|-----------|---------|-------|-------|
+| `keep_pct` | 0.3 | 0.1 - 0.5 | Fraction of chunks to keep. 0.1 = max speedup, 0.3 = safe default |
+| `threshold` | 8192 | 4096 - 16384 | Minimum prompt length to trigger SpecPrefill |
+| `lookahead` | 8 | 4 - 16 | Draft model decode steps used for scoring |
+| `pool_kernel` | 13 | 0 (off) - 21 | Smoothing kernel for attention scores |
+
+From the paper: `chunk_size=32` is fixed, and `keep_pct=0.1` is their default for maximum TTFT reduction.
+
+## Reproduce the benchmark
 
 ```bash
 cd benchmarks
@@ -201,7 +201,7 @@ cd benchmarks
 # A/B comparison (baseline vs specprefill)
 ./run_ab_kv_benchmark.sh
 
-# Keep_pct sweep (0.1, 0.3, 0.5)
+# keep_pct sweep
 python bench_keeppct_sweep.py
 
 # Official benchmark module wrapper
@@ -209,21 +209,6 @@ python bench_specprefill_official.py \
   --model Qwen3.6-35B-A3B-mixed4_6 \
   --draft-model Qwen3.5-0.8B-MLX-4bit-fp16
 ```
-
----
-
-## Hyperparameters
-
-| Parameter | Default | Range | Notes |
-|-----------|---------|-------|-------|
-| `keep_pct` | 0.3 | 0.1 - 0.5 | Fraction of tokens to keep. 0.1 = max speedup, 0.3 = safe default |
-| `threshold` | 8192 | 4096 - 16384 | Min prompt length to trigger SpecPrefill |
-| `lookahead` | 8 | 4 - 16 | Draft model decode steps for scoring |
-| `pool_kernel` | 13 | 0 (off) - 21 | Smoothing kernel for attention scores |
-
-From the paper: chunk_size=32 is fixed. `keep_pct=0.1` is their default for max TTFT reduction.
-
----
 
 ## Files
 
@@ -239,59 +224,39 @@ benchmarks/
   bench_keeppct_sweep.py          # Hyperparameter sweep
   bench_specprefill_official.py   # Official benchmark wrapper
   run_ab_kv_benchmark.sh          # Shell A/B benchmark
-  bench_specprefill_official_results.md  # Our results
+  bench_specprefill_official_results.md  # Committed results
 
 docs/
-  SPECPREFILL_INTEGRATION.md      # Architecture docs
+  SPECPREFILL_INTEGRATION.md      # Architecture notes
   PATCH_INVENTORY.md              # Prior patches (thinking models, etc.)
 ```
 
----
-
-## Architecture
-
-See [docs/SPECPREFILL_INTEGRATION.md](docs/SPECPREFILL_INTEGRATION.md) for:
-- How RoPE position mapping works
-- Hybrid model handling (Qwen3.5 GatedDeltaNet layers)
-- Sparse prefill vs standard speculative decoding differences
-
----
-
-## Other Patches Included
-
-This repo also includes documentation for other mlx-lm modifications:
+## Other patches included
 
 | Patch | File | Status | Description |
 |-------|------|--------|-------------|
-| **Asymmetric KV Split** | `models/cache.py` | **Applied** | `--kv-bits 8,4 --kv-group-size 64,32` for K=8bit/V=4bit quantization. Reduces memory vs symmetric KV. |
-| PR #1102 memory opt | `convert.py` | Documented | Per-layer eval during quantization (22-37% peak memory reduction). See `docs/PATCH_INVENTORY.md`. |
+| **Asymmetric KV split** | `models/cache.py` | **Applied** | `--kv-bits 8,4 --kv-group-size 64,32` for K=8-bit / V=4-bit quantization. Reduces memory vs symmetric KV. |
+| PR #1102 memory opt | `convert.py` | Documented | Per-layer eval during quantization (22-37% peak memory reduction). See [`docs/PATCH_INVENTORY.md`](docs/PATCH_INVENTORY.md). |
 
-**Note:** `preserve_thinking` and `checkpoint_caching` for Qwen3.x thinking models are already present in upstream mlx-lm v0.31.2 (verified against fresh `pip install mlx-lm==0.31.2`).
+`preserve_thinking` and `checkpoint_caching` for Qwen3.x thinking models are already present in upstream mlx-lm v0.31.2 (verified against a fresh `pip install mlx-lm==0.31.2`).
 
-See [docs/PATCH_INVENTORY.md](docs/PATCH_INVENTORY.md) for implementation details.
+## Architecture notes
 
----
+[`docs/SPECPREFILL_INTEGRATION.md`](docs/SPECPREFILL_INTEGRATION.md) covers:
 
-## Architecture
-
-See [docs/SPECPREFILL_INTEGRATION.md](docs/SPECPREFILL_INTEGRATION.md) for:
-- How RoPE position mapping works
+- RoPE position mapping for surviving tokens
 - Hybrid model handling (Qwen3.5 GatedDeltaNet layers)
-- Sparse prefill vs standard speculative decoding differences
-
----
+- How sparse prefill differs from standard speculative decoding
 
 ## Credits
 
-- **SpecPrefill paper:** Liu et al., "Speculative Prefill: Turbocharging TTFT with Lightweight and Training-Free Token Importance Estimation", ICML 2025. [arXiv:2502.02789](https://arxiv.org/abs/2502.02789)
-- **Reference implementation:** [vllm-mlx PR #180](https://github.com/waybarrios/vllm-mlx/pull/180) by waybarrios (merged Mar 2026)
-- **Base framework:** [mlx-lm](https://github.com/ml-explore/mlx-lm) by Apple/ml-explore
-- **Benchmark methodology:** Inspired by [Blaizzy's mlx-vlm TurboQuant benchmark](https://gist.github.com/Blaizzy/d6d975b5a6fde1b590b56f1ca34cdc77)
+- **Paper:** Liu et al., "Speculative Prefill: Turbocharging TTFT with Lightweight and Training-Free Token Importance Estimation", ICML 2025. [arXiv:2502.02789](https://arxiv.org/abs/2502.02789)
+- **Reference implementation:** [vllm-mlx PR #180](https://github.com/waybarrios/vllm-mlx/pull/180) by waybarrios
+- **Base framework:** [mlx-lm](https://github.com/ml-explore/mlx-lm) by Apple / ml-explore
+- **Benchmark methodology:** inspired by [Blaizzy's mlx-vlm TurboQuant benchmark](https://gist.github.com/Blaizzy/d6d975b5a6fde1b590b56f1ca34cdc77)
 
-This is a community port. Not affiliated with Apple, ml-explore, or the original paper authors.
-
----
+Community port. Not affiliated with Apple, ml-explore, or the paper authors.
 
 ## License
 
-Apache-2.0 (matches mlx-lm and the original SpecPrefill paper).
+Apache-2.0, matching mlx-lm and the original SpecPrefill paper.

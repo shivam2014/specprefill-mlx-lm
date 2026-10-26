@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="420" viewBox="0 0 1200 420"
+     role="img" aria-labelledby="heroTitle heroDesc">
+  <title id="heroTitle">SpecPrefill for mlx-lm — sparse prefill that skips unimportant prompt chunks</title>
+  <desc id="heroDesc">A small draft model scores 32-token chunks of a long prompt for importance, and the target model prefills only the important ones. The grid shows roughly 30 percent of chunks kept. Measured speedup in prompt processing on an M1 Max 64GB: 1.76x at a 16K-token prompt and 1.84x at 32K.</desc>
+
+  <defs>
+    <pattern id="chunks" width="31" height="31" patternUnits="userSpaceOnUse" x="624" y="124">
+      <rect width="26" height="26" rx="4" fill="#E7E3DA"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="420" rx="20" fill="#FAF9F6"/>
+  <rect x="0.75" y="0.75" width="1198.5" height="418.5" rx="20" fill="none" stroke="#E2DDD3" stroke-width="1.5"/>
+
+  <g id="title-block" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="56" y="96" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="18" letter-spacing="2" fill="#6B6F76">ICML 2025 &#183; APPLE SILICON PORT</text>
+
+    <text x="56" y="164" font-size="60" font-weight="650" fill="#16181D">SpecPrefill</text>
+    <text x="56" y="198" font-size="26" fill="#6B6F76">for mlx-lm</text>
+
+    <text x="56" y="250" font-size="21" fill="#16181D">A 0.8B draft model scores the chunks.</text>
+    <text x="56" y="278" font-size="21" fill="#6B6F76">The 35B target prefills only the ones that matter.</text>
+
+    <text x="56" y="380" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="18" fill="#6B6F76">35B target &#183; 0.8B draft &#183; M1 Max 64GB</text>
+  </g>
+
+  <g id="sparse-prefill">
+    <rect x="576" y="64" width="568" height="292" rx="12" fill="#FFFFFF" stroke="#E2DDD3" stroke-width="1.5"/>
+
+    <text x="624" y="96" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+          font-size="18" letter-spacing="2" fill="#6B6F76">SPARSE PREFILL &#183; 32-TOKEN CHUNKS</text>
+
+    <rect x="624" y="124" width="491" height="88" fill="url(#chunks)"/>
+
+    <g fill="#B4342A">
+      <rect x="624" y="124" width="26" height="26" rx="4"/>
+      <rect x="717" y="124" width="26" height="26" rx="4"/>
+      <rect x="841" y="124" width="26" height="26" rx="4"/>
+      <rect x="965" y="124" width="26" height="26" rx="4"/>
+      <rect x="1089" y="124" width="26" height="26" rx="4"/>
+
+      <rect x="686" y="155" width="26" height="26" rx="4"/>
+      <rect x="779" y="155" width="26" height="26" rx="4"/>
+      <rect x="903" y="155" width="26" height="26" rx="4"/>
+      <rect x="1058" y="155" width="26" height="26" rx="4"/>
+
+      <rect x="655" y="186" width="26" height="26" rx="4"/>
+      <rect x="810" y="186" width="26" height="26" rx="4"/>
+      <rect x="872" y="186" width="26" height="26" rx="4"/>
+      <rect x="996" y="186" width="26" height="26" rx="4"/>
+      <rect x="1089" y="186" width="26" height="26" rx="4"/>
+    </g>
+
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#6B6F76">
+      <rect x="624" y="228" width="14" height="14" rx="3" fill="#B4342A"/>
+      <text x="648" y="240">kept</text>
+      <rect x="700" y="228" width="14" height="14" rx="3" fill="#E7E3DA"/>
+      <text x="724" y="240">dropped</text>
+    </g>
+
+    <line x1="624" y1="270" x2="1096" y2="270" stroke="#E2DDD3" stroke-width="1.5"/>
+
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+      <text x="624" y="314" font-size="40" font-weight="700" fill="#16181D">1.76&#215;</text>
+      <text x="624" y="340" font-size="18" fill="#6B6F76">16K prompt</text>
+
+      <text x="900" y="314" font-size="40" font-weight="700" fill="#16181D">1.84&#215;</text>
+      <text x="900" y="340" font-size="18" fill="#6B6F76">32K prompt</text>
+    </g>
+  </g>
+</svg>
